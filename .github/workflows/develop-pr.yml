@@ -1,0 +1,68 @@
+name: Develop → PR
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: develop-pr
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+  open-pr:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Abrir PR develop → main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$(git log --oneline origin/main..origin/develop)" ]; then
+            echo "develop não tem commits à frente da main, nada a fazer"
+            exit 0
+          fi
+
+          EXISTING=$(gh pr list --base main --head develop --state open --json url --jq '.[0].url')
+          if [ -n "$EXISTING" ]; then
+            echo "PR já aberto, atualizado com o push: $EXISTING"
+            exit 0
+          fi
+
+          {
+            echo "PR automático: build da \`develop\` passou em ${{ github.sha }}."
+            echo
+            echo "Merge na \`main\` dispara o deploy em produção."
+            echo
+            echo "## Commits"
+            git log --pretty='- %h %s' origin/main..origin/develop
+          } > body.md
+
+          gh pr create --base main --head develop \
+            --title "Release: develop → main" \
+            --body-file body.md
