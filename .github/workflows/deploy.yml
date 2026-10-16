@@ -1,0 +1,42 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lucaspanzera
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install cloudflared
+        run: |
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+          chmod +x cloudflared
+          sudo mv cloudflared /usr/local/bin/
+
+      - name: Setup SSH keys and config
+        env:
+          JUMP_KEY: ${{ secrets.PELUGA_JUMP_SSH_KEY }}
+          APP_KEY: ${{ secrets.APP_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$JUMP_KEY" > ~/.ssh/jump_key
+          echo "$APP_KEY" > ~/.ssh/app_key
+          chmod 600 ~/.ssh/jump_key ~/.ssh/app_key
+          cat >> ~/.ssh/config << EOF
+          Host bastion
+            HostName bastion.peluga.com.br
+            User jump
+            IdentityFile ~/.ssh/jump_key
+            ProxyCommand cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CF_ACCESS_CLIENT_ID }} --service-token-secret ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+            StrictHostKeyChecking no
+          EOF
+
+      - name: Deploy
+        env:
+          APP_IP: ${{ vars.APP_IP }}
+        run: ssh -o StrictHostKeyChecking=no -J bastion -i ~/.ssh/app_key deploy@$APP_IP
