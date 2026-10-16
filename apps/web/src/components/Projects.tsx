@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ExternalLink, FileText, Filter, ArrowDownUp, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { projectsData } from '../data/projects';
+import { HowItReachesYou } from './HowItReachesYou';
 import { listArticles, articleExcerpt, articleTitle, articleBody } from '../lib/articles';
 import { listTags, primaryTagInfo, translateTagLabel, type Tag } from '../lib/tags';
 
@@ -221,6 +222,8 @@ export function Projects({ lang }: ProjectsProps) {
       </div>
 
       </div>
+
+      <HowItReachesYou lang={lang} />
 
       {/* Filterable Section */}
       <div className="max-w-5xl mx-auto px-6 py-24">
